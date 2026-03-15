@@ -10,6 +10,7 @@ import { StrategyList } from "./components/StrategyList";
 import { LiabilitiesPanel } from "./components/LiabilitiesPanel";
 import { Navigation } from "./components/Navigation";
 import { UpdatePage } from "./components/UpdatePage";
+import { ForecastPage } from "./components/ForecastPage";
 
 export default function App() {
   const { toUSD, status: fxStatus } = useFxRates();
@@ -123,6 +124,14 @@ export default function App() {
         <UpdatePage
           balances={balances}
           onSave={handleSave}
+          toUSD={toUSD}
+        />
+      )}
+
+      {view === "forecast" && (
+        <ForecastPage
+          holdings={liveHoldings}
+          liabilities={liveLiabilities}
           toUSD={toUSD}
         />
       )}
