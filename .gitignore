@@ -21,3 +21,6 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Financial data — contains real account values, do not commit
+src/data/initialData.js
