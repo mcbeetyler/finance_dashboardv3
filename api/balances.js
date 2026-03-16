@@ -35,11 +35,12 @@ export default async function handler(req, res) {
   }
 
   if (req.method === "GET") {
-    const [balances, snapshots] = await Promise.all([
+    const [balances, snapshots, forecastEvents] = await Promise.all([
       kv.get("finance_balances"),
       kv.get("finance_snapshots"),
+      kv.get("finance_forecast_events"),
     ]);
-    return res.status(200).json({ balances, snapshots });
+    return res.status(200).json({ balances, snapshots, forecastEvents });
   }
 
   if (req.method === "POST") {
@@ -47,6 +48,7 @@ export default async function handler(req, res) {
     const ops = [];
     if (body.balances !== undefined) ops.push(kv.set("finance_balances", body.balances));
     if (body.snapshots !== undefined) ops.push(kv.set("finance_snapshots", body.snapshots));
+    if (body.forecastEvents !== undefined) ops.push(kv.set("finance_forecast_events", body.forecastEvents));
     await Promise.all(ops);
     return res.status(200).json({ ok: true });
   }

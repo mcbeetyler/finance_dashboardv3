@@ -40,6 +40,8 @@ export default function App() {
     saveSnapshot,
     exportBackup,
     importBackup,
+    forecastEvents,
+    updateForecastEvents,
   } = useBalances();
 
   const [view, setView] = useState("dashboard");
@@ -199,6 +201,8 @@ export default function App() {
           holdings={liveHoldings}
           liabilities={liveLiabilities}
           toUSD={toUSD}
+          events={forecastEvents}
+          onEventsChange={updateForecastEvents}
         />
       )}
     </div>

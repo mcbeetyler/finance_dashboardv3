@@ -4,15 +4,14 @@
 import { useState, useMemo } from "react";
 import { ForecastChart } from "./ForecastChart";
 import { ForecastEvents } from "./ForecastEvents";
-import { runForecast, DEFAULT_EVENTS } from "../utils/forecastEngine";
+import { runForecast } from "../utils/forecastEngine";
 import { formatUSD } from "../utils/currency";
 
 const SCENARIOS = ["conservative", "base", "optimistic"];
 
-export function ForecastPage({ holdings, liabilities, toUSD }) {
+export function ForecastPage({ holdings, liabilities, toUSD, events, onEventsChange }) {
   const [monthlySavings, setMonthlySavings] = useState(6000);
   const [returnHomeMonth, setReturnHomeMonth] = useState("2028-09");
-  const [events, setEvents] = useState(DEFAULT_EVENTS);
   const [activeScenario, setActiveScenario] = useState("base");
 
   const forecast = useMemo(() => {
@@ -221,7 +220,7 @@ export function ForecastPage({ holdings, liabilities, toUSD }) {
       </div>
 
       {/* Events */}
-      <ForecastEvents events={events} onChange={setEvents} />
+      <ForecastEvents events={events} onChange={onEventsChange} />
 
       <p style={{ fontSize: "11px", color: "#bbb", textAlign: "right", margin: "1rem 0 0" }}>
         Projections are estimates only · Not financial advice

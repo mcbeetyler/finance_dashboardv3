@@ -5,9 +5,11 @@
 
 import { useState, useEffect } from "react";
 import { holdings, liabilities } from "../data/initialData";
+import { DEFAULT_EVENTS } from "../utils/forecastEngine";
 
 const BALANCES_KEY = "finance_balances";
 const SNAPSHOTS_KEY = "finance_snapshots";
+const EVENTS_KEY = "finance_forecast_events";
 
 // True when running on Vercel; false on localhost dev server
 const IS_LOCAL =
@@ -76,6 +78,10 @@ export function useBalances() {
     IS_LOCAL ? lsRead(SNAPSHOTS_KEY, []) : []
   );
 
+  const [forecastEvents, setForecastEvents] = useState(() =>
+    IS_LOCAL ? lsRead(EVENTS_KEY, DEFAULT_EVENTS) : DEFAULT_EVENTS
+  );
+
   // API mode: load from KV on mount
   useEffect(() => {
     if (IS_LOCAL) return;
@@ -83,6 +89,7 @@ export function useBalances() {
       if (!data) return;
       if (data.balances) setBalances(data.balances);
       if (data.snapshots) setSnapshots(data.snapshots);
+      if (data.forecastEvents) setForecastEvents(data.forecastEvents);
     });
   }, []);
 
@@ -96,6 +103,11 @@ export function useBalances() {
     if (!IS_LOCAL) return;
     lsWrite(SNAPSHOTS_KEY, snapshots);
   }, [snapshots]);
+
+  useEffect(() => {
+    if (!IS_LOCAL) return;
+    lsWrite(EVENTS_KEY, forecastEvents);
+  }, [forecastEvents]);
 
   // ── Actions ──────────────────────────────────────────────────────────────
 
@@ -146,6 +158,11 @@ export function useBalances() {
     URL.revokeObjectURL(url);
   }
 
+  function updateForecastEvents(newEvents) {
+    setForecastEvents(newEvents);
+    if (!IS_LOCAL) apiPost({ forecastEvents: newEvents });
+  }
+
   // Seed KV (or localStorage) from a previously exported backup JSON file.
   // Use this once after deploying to Vercel to migrate your local data.
   function importBackup(jsonText) {
@@ -173,5 +190,7 @@ export function useBalances() {
     saveSnapshot,
     exportBackup,
     importBackup,
+    forecastEvents,
+    updateForecastEvents,
   };
 }
