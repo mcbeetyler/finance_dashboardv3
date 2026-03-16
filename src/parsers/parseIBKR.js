@@ -5,29 +5,29 @@
 
 // Maps IBKR ticker symbols to holding IDs in initialData.js
 const TICKER_TO_HOLDING_ID = {
-  SGOV: "h4",
-  MINT: "h5",
-  TBUX: "h6",
-  SCHD: "h8",
-  VYM:  "h9",
-  VYMI: "h10",
-  ASML: "h11",
-  ITA:  "h12",
-  INTC: "h13",
-  PLTR: "h14",
-  AMD:  "h15",
-  NVDA: "h16",
-  TSLA: "h17",
-  UNH:  "h18",
-  UPS:  "h19",
-  BBAI: "h20",
-  SMCI: "h21",
-  KTOS: "h22",
-  AI:   "h23",
+  SGOV: "h12",
+  MINT: "h13",
+  TBUX: "h14",
+  SCHD: "h17",
+  VYM:  "h18",
+  VYMI: "h19",
+  ASML: "h20",
+  ITA:  "h21",
+  INTC: "h22",
+  PLTR: "h23",
+  AMD:  "h24",
+  NVDA: "h25",
+  TSLA: "h26",
+  UNH:  "h27",
+  UPS:  "h28",
+  BBAI: "h29",
+  SMCI: "h30",
+  KTOS: "h31",
+  AI:   "h32",
 };
 
 // Cash row in IBKR CSV appears as "USD" in the forex/cash section
-const CASH_HOLDING_ID = "h7";
+const CASH_HOLDING_ID = "h15";
 
 export function parseIBKR(csvText) {
   const lines = csvText.split("\n").map((l) => l.trim());

@@ -11,11 +11,12 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs
 // Maps Empower account name fragments to holding IDs in initialData.js
 // Add more entries here as your Empower accounts change
 const ACCOUNT_MAP = [
-  { match: "tyler schwab",                id: "h1",  label: "Schwab IRA" },
-  { match: "bayer",                       id: "h2",  label: "Fidelity — Bayer 401k" },
-  { match: "gemini",                      id: "h26", label: "Gemini crypto" },
-  { match: "chase",                       id: "h28", label: "Chase checking" },
-  { match: "goppert",                     id: "h29", label: "Goppert checking" },
+  { match: "tyler schwab",                id: "h16", label: "Tyler Schwab IRA" },
+  { match: "mindy schwab",                id: "h3",  label: "Mindy Schwab IRA" },
+  { match: "bayer",                       id: "h1",  label: "Fidelity — Bayer 401k" },
+  { match: "gemini",                      id: "h36", label: "Gemini crypto" },
+  { match: "chase",                       id: "h38", label: "Chase checking" },
+  { match: "goppert",                     id: "h40", label: "Goppert checking" },
   // Explicitly excluded — managed manually
   { match: "interactive brokers",         id: null,  label: "IBKR — handled via CSV" },
   { match: "ubs",                         id: null,  label: "UBS — manual CHF entry" },

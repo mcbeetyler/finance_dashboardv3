@@ -1,7 +1,7 @@
 // src/App.js
 // Main app — wires together navigation, dashboard, and update page
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useFxRates } from "./hooks/useFxRates";
 import { useBalances } from "./hooks/useBalances";
 import { strategies, holdings, liabilities } from "./data/initialData";
@@ -11,8 +11,27 @@ import { LiabilitiesPanel } from "./components/LiabilitiesPanel";
 import { Navigation } from "./components/Navigation";
 import { UpdatePage } from "./components/UpdatePage";
 import { ForecastPage } from "./components/ForecastPage";
+import { LoginPage } from "./components/LoginPage";
+
+// On localhost we skip auth (no API routes running)
+const IS_LOCAL =
+  typeof window !== "undefined" &&
+  (window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1");
 
 export default function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(IS_LOCAL);
+  const [authChecked, setAuthChecked] = useState(IS_LOCAL);
+
+  // Check for a valid session cookie on load (Vercel only)
+  useEffect(() => {
+    if (IS_LOCAL) return;
+    fetch("/api/auth")
+      .then((r) => setIsAuthenticated(r.ok))
+      .catch(() => setIsAuthenticated(false))
+      .finally(() => setAuthChecked(true));
+  }, []);
+
   const { toUSD, status: fxStatus } = useFxRates();
   const {
     balances,
@@ -20,9 +39,11 @@ export default function App() {
     updateBalances,
     saveSnapshot,
     exportBackup,
+    importBackup,
   } = useBalances();
 
   const [view, setView] = useState("dashboard");
+  const importInputRef = useRef(null);
 
   const totalAssets = holdings.reduce((sum, h) => {
     const amount = balances.holdings[h.id]?.nativeAmount ?? h.nativeAmount;
@@ -48,6 +69,21 @@ export default function App() {
     saveSnapshot(netWorth);
   }
 
+  function handleImportFile(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        importBackup(ev.target.result);
+      } catch {
+        alert("Invalid backup file");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  }
+
   const liveHoldings = holdings.map((h) => ({
     ...h,
     nativeAmount: balances.holdings[h.id]?.nativeAmount ?? h.nativeAmount,
@@ -57,6 +93,13 @@ export default function App() {
     ...l,
     nativeAmount: balances.liabilities[l.id]?.nativeAmount ?? l.nativeAmount,
   }));
+
+  // Show nothing until auth check completes (avoids flash of login page)
+  if (!authChecked) return null;
+
+  if (!isAuthenticated) {
+    return <LoginPage onLogin={() => setIsAuthenticated(true)} />;
+  }
 
   return (
     <div style={{
@@ -102,20 +145,43 @@ export default function App() {
                 month: "long", day: "numeric", year: "numeric",
               })}
             </p>
-            <button
-              onClick={exportBackup}
-              style={{
-                fontSize: "11px",
-                color: "#888",
-                background: "transparent",
-                border: "0.5px solid #e0e0e0",
-                borderRadius: "6px",
-                padding: "4px 10px",
-                cursor: "pointer",
-              }}
-            >
-              Export backup
-            </button>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <input
+                ref={importInputRef}
+                type="file"
+                accept=".json"
+                style={{ display: "none" }}
+                onChange={handleImportFile}
+              />
+              <button
+                onClick={() => importInputRef.current?.click()}
+                style={{
+                  fontSize: "11px",
+                  color: "#888",
+                  background: "transparent",
+                  border: "0.5px solid #e0e0e0",
+                  borderRadius: "6px",
+                  padding: "4px 10px",
+                  cursor: "pointer",
+                }}
+              >
+                Import backup
+              </button>
+              <button
+                onClick={exportBackup}
+                style={{
+                  fontSize: "11px",
+                  color: "#888",
+                  background: "transparent",
+                  border: "0.5px solid #e0e0e0",
+                  borderRadius: "6px",
+                  padding: "4px 10px",
+                  cursor: "pointer",
+                }}
+              >
+                Export backup
+              </button>
+            </div>
           </div>
         </>
       )}
