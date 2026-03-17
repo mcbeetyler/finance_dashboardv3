@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { parseIBKR } from "../parsers/parseIBKR";
 import { parseEmpower } from "../parsers/parseEmpower";
-import { holdings, liabilities } from "../data/initialData";
+import { strategies, holdings, liabilities } from "../data/initialData";
 import { formatUSD, formatNative } from "../utils/currency";
 
 export function UpdatePage({ balances, onSave, toUSD }) {
@@ -139,7 +139,7 @@ export function UpdatePage({ balances, onSave, toUSD }) {
         </div>
       )}
 
-      {/* Review table — holdings */}
+      {/* Review table — holdings grouped by strategy */}
       <ReviewSection
         title="Holdings"
         items={holdings}
@@ -148,6 +148,7 @@ export function UpdatePage({ balances, onSave, toUSD }) {
         balances={balances.holdings}
         onOverride={handleOverride}
         toUSD={toUSD}
+        strategies={strategies}
       />
 
       {/* Review table — liabilities */}
@@ -215,75 +216,137 @@ function DropZone({ label, accept, status, onChange, hint }) {
   );
 }
 
-function ReviewSection({ title, items, parsed, overrides, balances, onOverride, toUSD, isLiability }) {
+function ReviewRow({ item, parsed, overrides, balances, onOverride, toUSD, isLast }) {
+  const current = balances[item.id]?.nativeAmount ?? 0;
+  const parsedEntry = parsed[item.id];
+  const override = overrides[item.id];
+  const newAmount = override !== undefined
+    ? parseFloat(override) || 0
+    : parsedEntry?.amount ?? current;
+  const delta = toUSD(newAmount, item.currency) - toUSD(current, item.currency);
+  const hasChange = parsedEntry !== undefined || override !== undefined;
+  const isStale = balances[item.id]?.updatedAt
+    ? daysSince(balances[item.id].updatedAt) > 30
+    : current === 0;
+
+  return (
+    <div style={{
+      display: "grid",
+      gridTemplateColumns: "minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)",
+      gap: "8px",
+      alignItems: "center",
+      padding: "10px 16px",
+      borderBottom: isLast ? "none" : "0.5px solid #eee",
+      background: hasChange ? "#f0f7ff" : "transparent",
+    }}>
+      <div>
+        <p style={{ fontSize: "13px", margin: 0, color: "#1a1a1a" }}>{item.name}</p>
+        <p style={{ fontSize: "11px", margin: 0, color: "#bbb" }}>
+          {item.account} · {item.currency}
+          {isStale && <span style={{ color: "#BA7517", marginLeft: "6px" }}>● stale</span>}
+          {parsedEntry && <span style={{ color: "#185FA5", marginLeft: "6px" }}>● {parsedEntry.source}</span>}
+        </p>
+      </div>
+      <div style={{ fontSize: "13px", color: "#888", textAlign: "right" }}>
+        {formatNative(current, item.currency)}
+      </div>
+      <div style={{ textAlign: "right" }}>
+        <input
+          type="number"
+          value={override !== undefined ? override : parsedEntry !== undefined ? parsedEntry.amount : ""}
+          placeholder={String(current)}
+          onChange={(e) => onOverride(item.id, e.target.value)}
+          style={{
+            width: "100%",
+            fontSize: "13px",
+            padding: "4px 8px",
+            border: "0.5px solid #ccc",
+            borderRadius: "6px",
+            textAlign: "right",
+            background: parsedEntry && override === undefined ? "#E6F1FB" : "#fff",
+          }}
+        />
+      </div>
+      <div style={{
+        fontSize: "12px",
+        textAlign: "right",
+        color: delta > 0 ? "#3B6D11" : delta < 0 ? "#A32D2D" : "#bbb",
+        fontWeight: delta !== 0 ? "500" : "400",
+      }}>
+        {delta !== 0 ? (delta > 0 ? "+" : "") + formatUSD(delta) : "—"}
+      </div>
+    </div>
+  );
+}
+
+function ReviewSection({ title, items, parsed, overrides, balances, onOverride, toUSD, strategies }) {
+  const rowProps = { parsed, overrides, balances, onOverride, toUSD };
+
+  // Grouped by strategy when strategies are provided (holdings)
+  if (strategies) {
+    const groups = strategies
+      .map((s) => ({ strategy: s, items: items.filter((h) => h.strategyId === s.id) }))
+      .filter((g) => g.items.length > 0);
+
+    return (
+      <div style={{ marginBottom: "1.5rem" }}>
+        <p style={{ fontSize: "13px", fontWeight: "500", color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 0.75rem" }}>
+          {title}
+        </p>
+        <div style={{ border: "0.5px solid #e0e0e0", borderRadius: "12px", overflow: "hidden" }}>
+          {groups.map((group, gi) => (
+            <div key={group.strategy.id}>
+              <div style={{
+                padding: "7px 16px",
+                background: "#f5f5f3",
+                borderTop: gi > 0 ? "0.5px solid #e0e0e0" : "none",
+                borderBottom: "0.5px solid #eee",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+              }}>
+                <span style={{
+                  display: "inline-block",
+                  width: "8px",
+                  height: "8px",
+                  borderRadius: "50%",
+                  background: group.strategy.color,
+                  flexShrink: 0,
+                }} />
+                <span style={{ fontSize: "12px", fontWeight: "500", color: "#555" }}>
+                  {group.strategy.name}
+                </span>
+              </div>
+              {group.items.map((item, i) => (
+                <ReviewRow
+                  key={item.id}
+                  item={item}
+                  isLast={i === group.items.length - 1 && gi === groups.length - 1}
+                  {...rowProps}
+                />
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Flat list (liabilities)
   return (
     <div style={{ marginBottom: "1.5rem" }}>
       <p style={{ fontSize: "13px", fontWeight: "500", color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 0.75rem" }}>
         {title}
       </p>
       <div style={{ border: "0.5px solid #e0e0e0", borderRadius: "12px", overflow: "hidden" }}>
-        {items.map((item, i) => {
-          const current = balances[item.id]?.nativeAmount ?? 0;
-          const parsedEntry = parsed[item.id];
-          const override = overrides[item.id];
-          const newAmount = override !== undefined
-            ? parseFloat(override) || 0
-            : parsedEntry?.amount ?? current;
-          const delta = toUSD(newAmount, item.currency) - toUSD(current, item.currency);
-          const hasChange = parsedEntry !== undefined || override !== undefined;
-          const isStale = balances[item.id]?.updatedAt
-            ? daysSince(balances[item.id].updatedAt) > 30
-            : current === 0;
-
-          return (
-            <div key={item.id} style={{
-              display: "grid",
-              gridTemplateColumns: "minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)",
-              gap: "8px",
-              alignItems: "center",
-              padding: "10px 16px",
-              borderBottom: i < items.length - 1 ? "0.5px solid #eee" : "none",
-              background: hasChange ? "#f0f7ff" : "transparent",
-            }}>
-              <div>
-                <p style={{ fontSize: "13px", margin: 0, color: "#1a1a1a" }}>{item.name}</p>
-                <p style={{ fontSize: "11px", margin: 0, color: "#bbb" }}>
-                  {item.account} · {item.currency}
-                  {isStale && <span style={{ color: "#BA7517", marginLeft: "6px" }}>● stale</span>}
-                  {parsedEntry && <span style={{ color: "#185FA5", marginLeft: "6px" }}>● {parsedEntry.source}</span>}
-                </p>
-              </div>
-              <div style={{ fontSize: "13px", color: "#888", textAlign: "right" }}>
-                {formatNative(current, item.currency)}
-              </div>
-              <div style={{ textAlign: "right" }}>
-                <input
-                  type="number"
-                  value={override !== undefined ? override : parsedEntry !== undefined ? parsedEntry.amount : ""}
-                  placeholder={String(current)}
-                  onChange={(e) => onOverride(item.id, e.target.value)}
-                  style={{
-                    width: "100%",
-                    fontSize: "13px",
-                    padding: "4px 8px",
-                    border: "0.5px solid #ccc",
-                    borderRadius: "6px",
-                    textAlign: "right",
-                    background: parsedEntry && override === undefined ? "#E6F1FB" : "#fff",
-                  }}
-                />
-              </div>
-              <div style={{
-                fontSize: "12px",
-                textAlign: "right",
-                color: delta > 0 ? "#3B6D11" : delta < 0 ? "#A32D2D" : "#bbb",
-                fontWeight: delta !== 0 ? "500" : "400",
-              }}>
-                {delta !== 0 ? (delta > 0 ? "+" : "") + formatUSD(delta) : "—"}
-              </div>
-            </div>
-          );
-        })}
+        {items.map((item, i) => (
+          <ReviewRow
+            key={item.id}
+            item={item}
+            isLast={i === items.length - 1}
+            {...rowProps}
+          />
+        ))}
       </div>
     </div>
   );
