@@ -1,176 +1,120 @@
 // src/parsers/parseEmpower.js
-// Parses Empower dashboard PDF export.
-// Uses pdfjs x/y coordinates to group text into rows, then combines each
-// institution-name row with its subtitle row for unambiguous matching.
-// This correctly distinguishes duplicates like:
-//   "Vanguard / Cargill Employee Retirement"  (h6)
-//   "Vanguard - 1 / Cargill Employee Retirement"  (h9)
+// Parses Empower copy-paste CSV (manually copied from Empower dashboard).
+//
+// Row pattern (repeating):
+//   [Institution, Type, Amount]   ← account data row (col1 non-empty, col2 has $)
+//   [Subtitle,   ,    Timestamp]  ← account description row
+//
+// Institution is matched exactly; subtitle is matched as substring.
+// More specific entries (Vanguard - 1) must appear before less specific (Vanguard).
 
-import * as pdfjsLib from "pdfjs-dist";
-
-pdfjsLib.GlobalWorkerOptions.workerSrc =
-  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-
-// Maps combined (institution + subtitle) text to holding/liability IDs.
-// More specific strings must come before less specific ones.
-// isLiability: true → amount stored as Math.abs (Empower shows negatives)
 const ACCOUNT_MAP = [
-  // ── Holdings ────────────────────────────────────────────────────────────
-  { match: "bayer corporation",                        id: "h1",  label: "Fidelity — Bayer 401k" },
-  { match: "kids 529",                                 id: "h2",  label: "Kids 529" },
-  { match: "mindy schwab",                             id: "h3",  label: "Mindy Schwab" },
-  { match: "optum hsa",                                id: "h4",  label: "Optum HSA" },
-  { match: "trust schwab",                             id: "h5",  label: "Trust Schwab" },
-  // Vanguard -1 (1080 accounts) must appear BEFORE plain Vanguard to avoid
-  // "vanguard cargill..." matching the "vanguard - 1 cargill..." rows.
-  { match: "vanguard - 1 cargill employee retirement", id: "h9",  label: "Vanguard - 1 Cargill Employee Retirement (1080)" },
-  { match: "vanguard - 1 cargill partnership plan",    id: "h10", label: "Vanguard - 1 Cargill Partnership Plan (1080)" },
-  { match: "vanguard cargill employee retirement",     id: "h6",  label: "Vanguard — Cargill Employee Retirement" },
-  { match: "vanguard cargill partnership plan",        id: "h7",  label: "Vanguard — Cargill Partnership Plan" },
-  { match: "bonus deferral",                           id: "h8",  label: "Vanguard — Bonus Deferral Plan" },
-  { match: "tyler schwab",                             id: "h16", label: "Tyler Schwab" },
-  { match: "gemini",                                   id: "h36", label: "Gemini crypto" },
-  { match: "total checking",                           id: "h38", label: "Chase checking" },
-  { match: "draftkings",                               id: "h39", label: "DraftKings etc" },
-  { match: "goppert",                                  id: "h40", label: "Goppert checking" },
+  // ── Vanguard (institution exact-match required to disambiguate) ────────
+  { institution: "vanguard - 1", subtitle: "cargill employee",  id: "h9",  label: "Vanguard - 1 Cargill Employee Retirement (1080)" },
+  { institution: "vanguard - 1", subtitle: "cargill partnership", id: "h10", label: "Vanguard - 1 Cargill Partnership Plan (1080)" },
+  { institution: "vanguard - 1", subtitle: "bonus deferral",    id: "h8",  label: "Vanguard — Bonus Deferral Plan" },
+  { institution: "vanguard",     subtitle: "cargill employee",  id: "h6",  label: "Vanguard — Cargill Employee Retirement" },
+  { institution: "vanguard",     subtitle: "cargill partnership", id: "h7", label: "Vanguard — Cargill Partnership Plan" },
 
-  // ── Liabilities ─────────────────────────────────────────────────────────
-  { match: "platinum card",       id: "l1", label: "Amex Platinum",                isLiability: true },
-  { match: "ending in 9162",      id: "l2", label: "Chase credit card (9162)",     isLiability: true },
-  { match: "ending in 9216",      id: "l3", label: "Chase credit card (9216)",     isLiability: true },
-  { match: "investment property", id: "l4", label: "Investment property mortgage", isLiability: true },
+  // ── Other holdings (subtitle match only) ──────────────────────────────
+  { subtitle: "total checking",      id: "h38", label: "Chase checking" },
+  { subtitle: "draftkings",          id: "h39", label: "DraftKings etc" },
+  { subtitle: "goppert",             id: "h40", label: "Goppert checking" },
+  { subtitle: "bayer corporation",   id: "h1",  label: "Fidelity — Bayer 401k" },
+  { subtitle: "kids 529",            id: "h2",  label: "Kids 529" },
+  { subtitle: "mindy schwab",        id: "h3",  label: "Mindy Schwab" },
+  { subtitle: "optum hsa",           id: "h4",  label: "Optum HSA" },
+  { subtitle: "trust schwab",        id: "h5",  label: "Trust Schwab" },
+  { subtitle: "tyler schwab",        id: "h16", label: "Tyler Schwab" },
+  { subtitle: "gemini",              id: "h36", label: "Gemini crypto" },
 
-  // ── Explicitly excluded ─────────────────────────────────────────────────
-  { match: "interactive brokers", id: null, label: "IBKR — handled via CSV" },
-  { match: "ubs",                 id: null, label: "UBS — manual CHF entry" },
-  { match: "2222 w 73rd",         id: null, label: "Home — manual entry" },
+  // ── Liabilities ────────────────────────────────────────────────────────
+  { subtitle: "platinum card",       id: "l1",  label: "Amex Platinum",                isLiability: true },
+  { subtitle: "ending in 9162",      id: "l2",  label: "Chase credit card (9162)",     isLiability: true },
+  { subtitle: "ending in 9216",      id: "l3",  label: "Chase credit card (9216)",     isLiability: true },
+  { subtitle: "investment property", id: "l4",  label: "Investment property mortgage", isLiability: true },
+
+  // ── Explicitly excluded ────────────────────────────────────────────────
+  { subtitle: "interactive brokers", id: null, label: "IBKR — handled via CSV" },
+  { subtitle: "ubs",                 id: null, label: "UBS — manual CHF entry" },
+  { subtitle: "2222 w 73rd",         id: null, label: "Home — manual entry" },
+  { subtitle: "robinhood",           id: null, label: "Robinhood — closed" },
 ];
 
-export async function parseEmpower(file) {
-  const arrayBuffer = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-
-  // ── 1. Extract all text items with (x, y) positions ───────────────────
-  const allItems = [];
-  let pageYOffset = 0;
-
-  for (let p = 1; p <= pdf.numPages; p++) {
-    const page = await pdf.getPage(p);
-    const viewport = page.getViewport({ scale: 1 });
-    const content = await page.getTextContent();
-
-    for (const item of content.items) {
-      const str = item.str.trim();
-      if (!str) continue;
-      allItems.push({
-        str,
-        x: item.transform[4],
-        // PDF y is from bottom; flip so y increases top-to-bottom
-        y: pageYOffset + (viewport.height - item.transform[5]),
-      });
-    }
-
-    pageYOffset += viewport.height + 20;
+function parseAmount(str) {
+  if (!str) return null;
+  const s = str.replace(/[$,\s]/g, "");
+  // Parentheses = negative: ($1,234.56) → -1234.56
+  if (s.startsWith("(") && s.endsWith(")")) {
+    return -parseFloat(s.slice(1, -1));
   }
-
-  // ── 2. Group items into rows (same y ± 5pt) ───────────────────────────
-  const rowBuckets = [];
-  allItems.forEach((item) => {
-    const existing = rowBuckets.find((r) => Math.abs(r.y - item.y) <= 5);
-    if (existing) {
-      existing.items.push(item);
-    } else {
-      rowBuckets.push({ y: item.y, items: [item] });
-    }
-  });
-  rowBuckets.sort((a, b) => a.y - b.y);
-
-  // ── 3. Process each row: extract label text and dollar amount ──────────
-  const rows = rowBuckets.map((bucket) => {
-    const sorted = [...bucket.items].sort((a, b) => a.x - b.x);
-
-    // Dollar amount (may be negative for liabilities)
-    // Normalize away spaces after "$" to handle PDFs that store "$" as a separate token
-    const rowText = sorted.map((i) => i.str).join(" ").replace(/\$\s+/g, "$");
-    const amountMatch = rowText.match(/-?\$[\d,]+(?:\.\d{2})?/);
-
-    // Label: everything that isn't a dollar amount, lone "$", timestamp, or date
-    const label = sorted
-      .filter(
-        (i) =>
-          i.str !== "$" &&
-          !i.str.match(/^-?\$[\d,]+(?:\.\d{2})?$/) &&
-          !i.str.match(/^\d{1,2}:\d{2}$/) &&
-          !i.str.match(/^\d{1,2}\/\d{1,2}\/\d{4}$/) &&
-          i.str.toLowerCase() !== "manual entry"
-      )
-      .map((i) => i.str)
-      .join(" ");
-
-    return {
-      label,
-      amount: amountMatch
-        ? parseFloat(amountMatch[0].replace(/[$,]/g, ""))
-        : null,
-    };
-  });
-
-  // ── 4. Match rows to ACCOUNT_MAP ──────────────────────────────────────
-  const rowsWithAmounts = rows.filter(r => r.amount !== null);
-
-  // Build debug: first 30 combined strings from rows that have amounts
-  const debugCombined = rowsWithAmounts.slice(0, 30).map((r, i) => {
-    const subtitleLabel = rows[rows.indexOf(r) + 1]?.label ?? "";
-    return `${r.amount}: "${r.label} ${subtitleLabel}".trim()`;
-  });
-
-  const result = extractBalances(rows);
-  result.debug = {
-    totalRows: rows.length,
-    rowsWithAmounts: rowsWithAmounts.length,
-    combined: debugCombined,
-  };
-  return result;
+  const n = parseFloat(s);
+  return isNaN(n) ? null : n;
 }
 
-function extractBalances(rows) {
+function parseCSVLine(line) {
+  const cols = [];
+  let cur = "";
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    if (line[i] === '"') {
+      inQuotes = !inQuotes;
+    } else if (line[i] === "," && !inQuotes) {
+      cols.push(cur.trim());
+      cur = "";
+    } else {
+      cur += line[i];
+    }
+  }
+  cols.push(cur.trim());
+  return cols;
+}
+
+export async function parseEmpower(file) {
+  const raw = await file.text();
+  // Strip UTF-8 BOM if present
+  const text = raw.replace(/^\uFEFF/, "");
+  const lines = text.split(/\r?\n/).map(parseCSVLine);
+
   const matched = {};
   const excluded = [];
   const unmatched = [];
 
-  for (let i = 0; i < rows.length; i++) {
-    if (rows[i].amount === null) continue;
+  for (let i = 0; i < lines.length - 1; i++) {
+    const [col0, col1, col2] = lines[i];
 
-    // Combine the institution-name row with the subtitle row below it.
-    // This is what distinguishes "Vanguard" vs "Vanguard - 1" entries.
-    const subtitleLabel = rows[i + 1]?.label ?? "";
-    const combined = `${rows[i].label} ${subtitleLabel}`
-      .toLowerCase()
-      .replace(/\s+/g, " ")
-      .trim();
+    // Account row: has a type in col1 and a dollar amount in col2
+    if (!col1 || !col2 || !col2.includes("$")) continue;
 
-    for (const account of ACCOUNT_MAP) {
-      if (!combined.includes(account.match.toLowerCase())) continue;
+    const amount = parseAmount(col2);
+    if (amount === null) continue;
 
-      if (account.id === null) {
-        excluded.push(account.label);
-        break;
-      }
+    const institution = col0.toLowerCase().trim();
+    const subtitle = (lines[i + 1]?.[0] ?? "").toLowerCase().trim();
 
-      // First match wins — don't overwrite if already found
-      if (!matched[account.id]) {
-        matched[account.id] = {
-          amount: account.isLiability
-            ? Math.abs(rows[i].amount)
-            : rows[i].amount,
-          label: account.label,
-          source: "Empower PDF",
-          isLiability: !!account.isLiability,
+    let found = false;
+    for (const acct of ACCOUNT_MAP) {
+      if (acct.institution && institution !== acct.institution) continue;
+      if (!subtitle.includes(acct.subtitle)) continue;
+
+      found = true;
+      if (acct.id === null) {
+        excluded.push(acct.label);
+      } else if (!matched[acct.id]) {
+        matched[acct.id] = {
+          amount: acct.isLiability ? Math.abs(amount) : amount,
+          label: acct.label,
+          source: "Empower CSV",
+          isLiability: !!acct.isLiability,
         };
       }
       break;
     }
+
+    if (!found) {
+      unmatched.push({ institution: col0, subtitle: lines[i + 1]?.[0] ?? "", amount });
+    }
   }
 
-  return { matched, unmatched, excluded };
+  return { matched, excluded, unmatched };
 }

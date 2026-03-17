@@ -38,14 +38,11 @@ export function UpdatePage({ balances, onSave, toUSD }) {
     if (!file) return;
     setStatus((s) => ({ ...s, empower: "parsing" }));
     try {
-      const { matched, excluded, debug } = await parseEmpower(file);
+      const { matched, excluded } = await parseEmpower(file);
       setParsed((p) => ({ ...p, ...matched }));
-      const debugStr = debug
-        ? ` | rows:${debug.totalRows} withAmts:${debug.rowsWithAmounts} | ${debug.combined.slice(0, 5).join(" || ")}`
-        : "";
       setStatus((s) => ({
         ...s,
-        empower: `Parsed — ${Object.keys(matched).length} accounts found, ${excluded.length} excluded${debugStr}`,
+        empower: `Parsed — ${Object.keys(matched).length} accounts found, ${excluded.length} excluded`,
       }));
     } catch (err) {
       setStatus((s) => ({
@@ -120,8 +117,8 @@ export function UpdatePage({ balances, onSave, toUSD }) {
           hint="Activity Statement export"
         />
         <DropZone
-          label="Empower PDF"
-          accept=".pdf"
+          label="Empower CSV"
+          accept=".csv"
           status={status.empower}
           onChange={handleEmpower}
           hint="Dashboard PDF export"
