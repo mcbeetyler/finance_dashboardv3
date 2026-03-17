@@ -1,10 +1,26 @@
 // api/balances.js
-// Vercel serverless function — balance data CRUD backed by Vercel KV
-// GET  /api/balances          → { balances, snapshots }
-// POST /api/balances          → save { balances?, snapshots? }
+// Vercel serverless function — balance data CRUD backed by Redis (REDIS_URL)
+// GET  /api/balances  → { balances, snapshots, forecastEvents }
+// POST /api/balances  → save { balances?, snapshots?, forecastEvents? }
 
 import crypto from "crypto";
-import { kv } from "@vercel/kv";
+import Redis from "ioredis";
+
+// Reuse connection across warm invocations
+let _redis;
+function getRedis() {
+  if (!_redis) _redis = new Redis(process.env.REDIS_URL);
+  return _redis;
+}
+
+async function kvGet(key) {
+  const val = await getRedis().get(key);
+  return val ? JSON.parse(val) : null;
+}
+
+async function kvSet(key, value) {
+  await getRedis().set(key, JSON.stringify(value));
+}
 
 function parseCookies(header) {
   const out = {};
@@ -29,6 +45,9 @@ export default async function handler(req, res) {
   if (!process.env.APP_PASSWORD) {
     return res.status(500).json({ error: "APP_PASSWORD not configured" });
   }
+  if (!process.env.REDIS_URL) {
+    return res.status(500).json({ error: "REDIS_URL not configured" });
+  }
 
   if (!isAuthorized(req)) {
     return res.status(401).json({ error: "Unauthorized" });
@@ -36,9 +55,9 @@ export default async function handler(req, res) {
 
   if (req.method === "GET") {
     const [balances, snapshots, forecastEvents] = await Promise.all([
-      kv.get("finance_balances"),
-      kv.get("finance_snapshots"),
-      kv.get("finance_forecast_events"),
+      kvGet("finance_balances"),
+      kvGet("finance_snapshots"),
+      kvGet("finance_forecast_events"),
     ]);
     return res.status(200).json({ balances, snapshots, forecastEvents });
   }
@@ -46,9 +65,9 @@ export default async function handler(req, res) {
   if (req.method === "POST") {
     const body = req.body || {};
     const ops = [];
-    if (body.balances !== undefined) ops.push(kv.set("finance_balances", body.balances));
-    if (body.snapshots !== undefined) ops.push(kv.set("finance_snapshots", body.snapshots));
-    if (body.forecastEvents !== undefined) ops.push(kv.set("finance_forecast_events", body.forecastEvents));
+    if (body.balances !== undefined) ops.push(kvSet("finance_balances", body.balances));
+    if (body.snapshots !== undefined) ops.push(kvSet("finance_snapshots", body.snapshots));
+    if (body.forecastEvents !== undefined) ops.push(kvSet("finance_forecast_events", body.forecastEvents));
     await Promise.all(ops);
     return res.status(200).json({ ok: true });
   }
