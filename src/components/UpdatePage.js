@@ -225,9 +225,8 @@ function ReviewRow({ item, parsed, overrides, balances, onOverride, toUSD, isLas
     : parsedEntry?.amount ?? current;
   const delta = toUSD(newAmount, item.currency) - toUSD(current, item.currency);
   const hasChange = parsedEntry !== undefined || override !== undefined;
-  const isStale = balances[item.id]?.updatedAt
-    ? daysSince(balances[item.id].updatedAt) > 30
-    : current === 0;
+  const updatedAt = balances[item.id]?.updatedAt ?? null;
+  const stale = updatedAt ? daysSince(updatedAt) > 30 : current === 0;
 
   return (
     <div style={{
@@ -243,8 +242,12 @@ function ReviewRow({ item, parsed, overrides, balances, onOverride, toUSD, isLas
         <p style={{ fontSize: "13px", margin: 0, color: "#1a1a1a" }}>{item.name}</p>
         <p style={{ fontSize: "11px", margin: 0, color: "#bbb" }}>
           {item.account} · {item.currency}
-          {isStale && <span style={{ color: "#BA7517", marginLeft: "6px" }}>● stale</span>}
-          {parsedEntry && <span style={{ color: "#185FA5", marginLeft: "6px" }}>● {parsedEntry.source}</span>}
+          {parsedEntry
+            ? <span style={{ color: "#185FA5", marginLeft: "6px" }}>● {parsedEntry.source}</span>
+            : <span style={{ color: stale ? "#BA7517" : "#bbb", marginLeft: "6px" }}>
+                · {updatedAt ? formatUpdatedAt(updatedAt) : "never updated"}
+              </span>
+          }
         </p>
       </div>
       <div style={{ fontSize: "13px", color: "#888", textAlign: "right" }}>
@@ -354,6 +357,19 @@ function ReviewSection({ title, items, parsed, overrides, balances, onOverride, 
 
 function daysSince(isoString) {
   if (!isoString) return 999;
-  const diff = Date.now() - new Date(isoString).getTime();
-  return Math.floor(diff / (1000 * 60 * 60 * 24));
+  return Math.floor((Date.now() - new Date(isoString).getTime()) / 86400000);
+}
+
+function formatUpdatedAt(isoString) {
+  const d = new Date(isoString);
+  const days = daysSince(isoString);
+  if (days === 0) return "updated today";
+  if (days === 1) return "updated yesterday";
+  const sameYear = d.getFullYear() === new Date().getFullYear();
+  const label = d.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    ...(sameYear ? {} : { year: "numeric" }),
+  });
+  return `updated ${label}`;
 }
