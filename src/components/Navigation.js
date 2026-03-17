@@ -1,10 +1,11 @@
 // src/components/Navigation.js
-// Tab bar — Dashboard | Update Balances | Forecast
+// Tab bar — Dashboard | Update Balances | Charts | Forecast
 
 export function Navigation({ currentView, onViewChange, hasStaleAccounts }) {
   const tabs = [
     { id: "dashboard", label: "Dashboard" },
     { id: "update", label: "Update Balances" },
+    { id: "charts", label: "Charts" },
     { id: "forecast", label: "Forecast" },
   ];
 

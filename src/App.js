@@ -11,6 +11,7 @@ import { LiabilitiesPanel } from "./components/LiabilitiesPanel";
 import { Navigation } from "./components/Navigation";
 import { UpdatePage } from "./components/UpdatePage";
 import { ForecastPage } from "./components/ForecastPage";
+import { ChartsPage } from "./components/ChartsPage";
 import { LoginPage } from "./components/LoginPage";
 
 // On localhost we skip auth (no API routes running)
@@ -35,6 +36,7 @@ export default function App() {
   const { toUSD, status: fxStatus } = useFxRates();
   const {
     balances,
+    snapshots,
     lastSnapshot,
     updateBalances,
     saveSnapshot,
@@ -192,6 +194,15 @@ export default function App() {
         <UpdatePage
           balances={balances}
           onSave={handleSave}
+          toUSD={toUSD}
+        />
+      )}
+
+      {view === "charts" && (
+        <ChartsPage
+          snapshots={snapshots}
+          strategies={strategies}
+          holdings={liveHoldings}
           toUSD={toUSD}
         />
       )}
