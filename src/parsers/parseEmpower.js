@@ -116,7 +116,13 @@ export async function parseEmpower(file) {
   });
 
   // ── 4. Match rows to ACCOUNT_MAP ──────────────────────────────────────
-  return extractBalances(rows);
+  console.log("[Empower] rows extracted:", rows.length);
+  console.log("[Empower] rows with amounts:", rows.filter(r => r.amount !== null).length);
+  console.log("[Empower] first 40 rows:", rows.slice(0, 40));
+  const result = extractBalances(rows);
+  console.log("[Empower] matched:", result.matched);
+  console.log("[Empower] excluded:", result.excluded);
+  return result;
 }
 
 function extractBalances(rows) {
