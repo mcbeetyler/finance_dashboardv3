@@ -59,16 +59,16 @@ export async function parseEmpower(file) {
     const viewport = page.getViewport({ scale: 1 });
     const content = await page.getTextContent();
 
-    content.items.forEach((item) => {
+    for (const item of content.items) {
       const str = item.str.trim();
-      if (!str) return;
+      if (!str) continue;
       allItems.push({
         str,
         x: item.transform[4],
         // PDF y is from bottom; flip so y increases top-to-bottom
         y: pageYOffset + (viewport.height - item.transform[5]),
       });
-    });
+    }
 
     pageYOffset += viewport.height + 20;
   }
@@ -90,15 +90,15 @@ export async function parseEmpower(file) {
     const sorted = [...bucket.items].sort((a, b) => a.x - b.x);
 
     // Dollar amount (may be negative for liabilities)
-    const amountMatch = sorted
-      .map((i) => i.str)
-      .join(" ")
-      .match(/-?\$[\d,]+(?:\.\d{2})?/);
+    // Normalize away spaces after "$" to handle PDFs that store "$" as a separate token
+    const rowText = sorted.map((i) => i.str).join(" ").replace(/\$\s+/g, "$");
+    const amountMatch = rowText.match(/-?\$[\d,]+(?:\.\d{2})?/);
 
-    // Label: everything that isn't a dollar amount, timestamp, or date
+    // Label: everything that isn't a dollar amount, lone "$", timestamp, or date
     const label = sorted
       .filter(
         (i) =>
+          i.str !== "$" &&
           !i.str.match(/^-?\$[\d,]+(?:\.\d{2})?$/) &&
           !i.str.match(/^\d{1,2}:\d{2}$/) &&
           !i.str.match(/^\d{1,2}\/\d{1,2}\/\d{4}$/) &&
@@ -116,12 +116,20 @@ export async function parseEmpower(file) {
   });
 
   // ── 4. Match rows to ACCOUNT_MAP ──────────────────────────────────────
-  console.log("[Empower] rows extracted:", rows.length);
-  console.log("[Empower] rows with amounts:", rows.filter(r => r.amount !== null).length);
-  console.log("[Empower] first 40 rows:", rows.slice(0, 40));
+  const rowsWithAmounts = rows.filter(r => r.amount !== null);
+
+  // Build debug: first 30 combined strings from rows that have amounts
+  const debugCombined = rowsWithAmounts.slice(0, 30).map((r, i) => {
+    const subtitleLabel = rows[rows.indexOf(r) + 1]?.label ?? "";
+    return `${r.amount}: "${r.label} ${subtitleLabel}".trim()`;
+  });
+
   const result = extractBalances(rows);
-  console.log("[Empower] matched:", result.matched);
-  console.log("[Empower] excluded:", result.excluded);
+  result.debug = {
+    totalRows: rows.length,
+    rowsWithAmounts: rowsWithAmounts.length,
+    combined: debugCombined,
+  };
   return result;
 }
 

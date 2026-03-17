@@ -38,11 +38,14 @@ export function UpdatePage({ balances, onSave, toUSD }) {
     if (!file) return;
     setStatus((s) => ({ ...s, empower: "parsing" }));
     try {
-      const { matched, excluded } = await parseEmpower(file);
+      const { matched, excluded, debug } = await parseEmpower(file);
       setParsed((p) => ({ ...p, ...matched }));
+      const debugStr = debug
+        ? ` | rows:${debug.totalRows} withAmts:${debug.rowsWithAmounts} | ${debug.combined.slice(0, 5).join(" || ")}`
+        : "";
       setStatus((s) => ({
         ...s,
-        empower: `Parsed — ${Object.keys(matched).length} accounts found, ${excluded.length} excluded`,
+        empower: `Parsed — ${Object.keys(matched).length} accounts found, ${excluded.length} excluded${debugStr}`,
       }));
     } catch (err) {
       setStatus((s) => ({
