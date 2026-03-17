@@ -42,12 +42,13 @@ function currentYearMonth() {
 }
 
 export function runForecast({
-  holdings,           // live holdings array with nativeAmount + strategyId
-  liabilities,        // live liabilities array
-  toUSD,              // FX conversion function
-  monthlySavings,     // number — total monthly savings to add to liquid
-  events,             // array of { id, date (YYYY-MM), amount, bucket, label }
-  endYearMonth,       // e.g. "2028-12"
+  holdings,            // live holdings array with nativeAmount + strategyId
+  liabilities,         // live liabilities array
+  toUSD,               // FX conversion function
+  monthlySavings,      // number — total monthly savings to add to liquid (house-fund)
+  monthlyRetirement,   // number — total monthly 401k/retirement contributions
+  events,              // array of { id, date (YYYY-MM), amount, bucket, label }
+  endYearMonth,        // e.g. "2028-12"
 }) {
   const start = currentYearMonth();
 
@@ -89,6 +90,9 @@ export function runForecast({
 
       // Add monthly savings to house-fund (liquid savings bucket)
       buckets["house-fund"] = (buckets["house-fund"] || 0) + monthlySavings;
+
+      // Add monthly retirement contributions
+      buckets["retirement"] = (buckets["retirement"] || 0) + (monthlyRetirement || 0);
 
       // Apply one-off events this month
       const monthEvents = eventsByMonth[current] || [];

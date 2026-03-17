@@ -11,6 +11,7 @@ const SCENARIOS = ["conservative", "base", "optimistic"];
 
 export function ForecastPage({ holdings, liabilities, toUSD, events, onEventsChange }) {
   const [monthlySavings, setMonthlySavings] = useState(6000);
+  const [monthlyRetirement, setMonthlyRetirement] = useState(1750);
   const [returnHomeMonth, setReturnHomeMonth] = useState("2028-09");
   const [activeScenario, setActiveScenario] = useState("base");
 
@@ -20,10 +21,11 @@ export function ForecastPage({ holdings, liabilities, toUSD, events, onEventsCha
       liabilities,
       toUSD,
       monthlySavings,
+      monthlyRetirement,
       events,
       endYearMonth: "2028-12",
     });
-  }, [holdings, liabilities, toUSD, monthlySavings, events]);
+  }, [holdings, liabilities, toUSD, monthlySavings, monthlyRetirement, events]);
 
   // Pull out the return-home month data point for the summary cards
   const summaryPoint = useMemo(() => {
@@ -91,6 +93,29 @@ export function ForecastPage({ holdings, liabilities, toUSD, events, onEventsCha
 
         <div>
           <label style={{ fontSize: "11px", color: "#888", display: "block", marginBottom: "4px" }}>
+            Monthly retirement
+          </label>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <span style={{ fontSize: "13px", color: "#888" }}>$</span>
+            <input
+              type="number"
+              value={monthlyRetirement}
+              onChange={(e) => setMonthlyRetirement(Number(e.target.value) || 0)}
+              style={{
+                width: "100%",
+                fontSize: "14px",
+                fontWeight: "500",
+                padding: "6px 8px",
+                border: "0.5px solid #ccc",
+                borderRadius: "6px",
+                boxSizing: "border-box",
+              }}
+            />
+          </div>
+        </div>
+
+        <div>
+          <label style={{ fontSize: "11px", color: "#888", display: "block", marginBottom: "4px" }}>
             Return home
           </label>
           <input
@@ -110,7 +135,7 @@ export function ForecastPage({ holdings, liabilities, toUSD, events, onEventsCha
           />
         </div>
 
-        <div>
+        <div style={{ gridColumn: "1 / -1" }}>
           <label style={{ fontSize: "11px", color: "#888", display: "block", marginBottom: "4px" }}>
             Scenario
           </label>
