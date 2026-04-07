@@ -1,33 +1,46 @@
 // api/balances.js
-// Vercel serverless function — balance data CRUD backed by Redis (REDIS_URL)
+// Vercel serverless function — balance data CRUD backed by Upstash Redis
+// Uses the HTTP REST API (derived from REDIS_URL) instead of ioredis TCP,
+// which is unreliable in serverless cold-start environments.
 // GET  /api/balances  → { balances, snapshots, forecastEvents }
 // POST /api/balances  → save { balances?, snapshots?, forecastEvents? }
 
 import crypto from "crypto";
-import Redis from "ioredis";
 
-// Reuse connection across warm invocations
-let _redis;
-function getRedis() {
-  if (!_redis) {
-    const url = process.env.REDIS_URL;
-    _redis = new Redis(url, {
-      tls: url.startsWith("rediss://") ? { rejectUnauthorized: false } : undefined,
-      maxRetriesPerRequest: 3,
-      connectTimeout: 5000,
-    });
-  }
-  return _redis;
+// ── Upstash REST helpers ───────────────────────────────────────────────────
+// Derives the REST URL + token from the standard REDIS_URL:
+//   rediss://default:TOKEN@hostname.upstash.io:6379
+//       → https://hostname.upstash.io  +  Bearer TOKEN
+
+function getUpstash() {
+  const url = new URL(process.env.REDIS_URL);
+  return {
+    restUrl: `https://${url.hostname}`,
+    token: url.password,
+  };
 }
 
 async function kvGet(key) {
-  const val = await getRedis().get(key);
-  return val ? JSON.parse(val) : null;
+  const { restUrl, token } = getUpstash();
+  const res = await fetch(`${restUrl}/pipeline`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify([["GET", key]]),
+  });
+  const [[result]] = await res.json();
+  return result ? JSON.parse(result) : null;
 }
 
 async function kvSet(key, value) {
-  await getRedis().set(key, JSON.stringify(value));
+  const { restUrl, token } = getUpstash();
+  await fetch(`${restUrl}/pipeline`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify([["SET", key, JSON.stringify(value)]]),
+  });
 }
+
+// ── Auth ───────────────────────────────────────────────────────────────────
 
 function parseCookies(header) {
   const out = {};
@@ -47,6 +60,8 @@ function isAuthorized(req) {
     .digest("hex");
   return cookies.session === expected;
 }
+
+// ── Handler ────────────────────────────────────────────────────────────────
 
 export default async function handler(req, res) {
   try {
