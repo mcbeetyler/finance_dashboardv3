@@ -9,7 +9,14 @@ import Redis from "ioredis";
 // Reuse connection across warm invocations
 let _redis;
 function getRedis() {
-  if (!_redis) _redis = new Redis(process.env.REDIS_URL);
+  if (!_redis) {
+    const url = process.env.REDIS_URL;
+    _redis = new Redis(url, {
+      tls: url.startsWith("rediss://") ? { rejectUnauthorized: false } : undefined,
+      maxRetriesPerRequest: 3,
+      connectTimeout: 5000,
+    });
+  }
   return _redis;
 }
 
@@ -42,36 +49,41 @@ function isAuthorized(req) {
 }
 
 export default async function handler(req, res) {
-  if (!process.env.APP_PASSWORD) {
-    return res.status(500).json({ error: "APP_PASSWORD not configured" });
-  }
-  if (!process.env.REDIS_URL) {
-    return res.status(500).json({ error: "REDIS_URL not configured" });
-  }
+  try {
+    if (!process.env.APP_PASSWORD) {
+      return res.status(500).json({ error: "APP_PASSWORD not configured" });
+    }
+    if (!process.env.REDIS_URL) {
+      return res.status(500).json({ error: "REDIS_URL not configured" });
+    }
 
-  if (!isAuthorized(req)) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
+    if (!isAuthorized(req)) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
 
-  if (req.method === "GET") {
-    const [balances, snapshots, forecastEvents] = await Promise.all([
-      kvGet("finance_balances"),
-      kvGet("finance_snapshots"),
-      kvGet("finance_forecast_events"),
-    ]);
-    return res.status(200).json({ balances, snapshots, forecastEvents });
-  }
+    if (req.method === "GET") {
+      const [balances, snapshots, forecastEvents] = await Promise.all([
+        kvGet("finance_balances"),
+        kvGet("finance_snapshots"),
+        kvGet("finance_forecast_events"),
+      ]);
+      return res.status(200).json({ balances, snapshots, forecastEvents });
+    }
 
-  if (req.method === "POST") {
-    const body = req.body || {};
-    const ops = [];
-    if (body.balances !== undefined) ops.push(kvSet("finance_balances", body.balances));
-    if (body.snapshots !== undefined) ops.push(kvSet("finance_snapshots", body.snapshots));
-    if (body.forecastEvents !== undefined) ops.push(kvSet("finance_forecast_events", body.forecastEvents));
-    await Promise.all(ops);
-    return res.status(200).json({ ok: true });
-  }
+    if (req.method === "POST") {
+      const body = req.body || {};
+      const ops = [];
+      if (body.balances !== undefined) ops.push(kvSet("finance_balances", body.balances));
+      if (body.snapshots !== undefined) ops.push(kvSet("finance_snapshots", body.snapshots));
+      if (body.forecastEvents !== undefined) ops.push(kvSet("finance_forecast_events", body.forecastEvents));
+      await Promise.all(ops);
+      return res.status(200).json({ ok: true });
+    }
 
-  res.setHeader("Allow", "GET, POST");
-  res.status(405).end();
+    res.setHeader("Allow", "GET, POST");
+    res.status(405).end();
+  } catch (err) {
+    console.error("[balances] error:", err);
+    return res.status(500).json({ error: err.message });
+  }
 }
