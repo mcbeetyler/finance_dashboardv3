@@ -22,13 +22,17 @@ function getUpstash() {
 
 async function kvGet(key) {
   const { restUrl, token } = getUpstash();
-  const res = await fetch(`${restUrl}/pipeline`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify([["GET", key]]),
-  });
-  const [[result]] = await res.json();
-  return result ? JSON.parse(result) : null;
+  try {
+    const res = await fetch(`${restUrl}/pipeline`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify([["GET", key]]),
+    });
+    const [[result]] = await res.json();
+    return result ? JSON.parse(result) : null;
+  } catch (err) {
+    throw new Error(`kvGet failed [url=${restUrl}]: ${err.message} | cause: ${err.cause?.message}`);
+  }
 }
 
 async function kvSet(key, value) {
