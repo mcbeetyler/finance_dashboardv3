@@ -13,10 +13,9 @@ import crypto from "crypto";
 //       → https://hostname.upstash.io  +  Bearer TOKEN
 
 function getUpstash() {
-  const url = new URL(process.env.REDIS_URL);
   return {
-    restUrl: `https://${url.hostname}`,
-    token: url.password,
+    restUrl: process.env.finance_dashboard_KV_REST_API_URL,
+    token: process.env.finance_dashboard_KV_REST_API_TOKEN,
   };
 }
 
@@ -72,8 +71,8 @@ export default async function handler(req, res) {
     if (!process.env.APP_PASSWORD) {
       return res.status(500).json({ error: "APP_PASSWORD not configured" });
     }
-    if (!process.env.REDIS_URL) {
-      return res.status(500).json({ error: "REDIS_URL not configured" });
+    if (!process.env.finance_dashboard_KV_REST_API_URL) {
+      return res.status(500).json({ error: "finance_dashboard_KV_REST_API_URL not configured" });
     }
 
     if (!isAuthorized(req)) {
