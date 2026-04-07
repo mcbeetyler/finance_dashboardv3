@@ -27,7 +27,8 @@ async function kvGet(key) {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify([["GET", key]]),
     });
-    const [[result]] = await res.json();
+    const data = await res.json();
+    const result = data[0]?.result;
     return result ? JSON.parse(result) : null;
   } catch (err) {
     throw new Error(`kvGet failed [url=${restUrl}]: ${err.message} | cause: ${err.cause?.message}`);
