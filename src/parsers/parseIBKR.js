@@ -24,6 +24,7 @@ const TICKER_TO_HOLDING_ID = {
   SMCI: "h30",
   KTOS: "h31",
   AI:   "h32",
+  GOOGL:"h49",
 };
 
 // Cash row in IBKR CSV appears as "USD" in the forex/cash section

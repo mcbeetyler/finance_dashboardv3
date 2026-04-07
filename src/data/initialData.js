@@ -80,6 +80,7 @@ export const holdings = [
 
   // ── Short-term growth — LTI ───────────────────────────
   { id: "h48", name: "Cargill LTI — restricted stock units",         account: "Cargill LTI",               strategyId: "short-term-growth", currency: "USD", nativeAmount: 0 },
+  { id: "h49", name: "IBKR — GOOGL (Alphabet)",                      account: "IBKR",                      strategyId: "short-term-growth", currency: "USD", nativeAmount: 0 },
 ];
 
 export const liabilities = [
